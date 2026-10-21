@@ -91,11 +91,14 @@ impl Config {
 	}
 
 	pub fn archive_dir(&self) -> Result<PathBuf> {
-		if let Some(dir) = &self.archive_dir {
-			Ok(PathBuf::from(dir))
-		} else {
-			let home = home_dir().context("Could not find your home directory")?;
-			Ok(home.join("gitkeep"))
+		let home = || home_dir().context("Could not find your home directory");
+		match self.archive_dir.as_deref() {
+			None => Ok(home()?.join("gitkeep")),
+			Some("~") => home(),
+			Some(dir) => match dir.strip_prefix("~/") {
+				Some(rest) => Ok(home()?.join(rest)),
+				None => Ok(PathBuf::from(dir)),
+			},
 		}
 	}
 
@@ -286,6 +289,15 @@ mod tests {
 	use toml::to_string;
 
 	use super::*;
+
+	#[test]
+	fn archive_dir_expands_tilde() {
+		let home = home_dir().unwrap();
+		let dir = |d: &str| Config { archive_dir: Some(d.into()), ..Config::default() }.archive_dir().unwrap();
+		assert_eq!(dir("~/gh"), home.join("gh"));
+		assert_eq!(dir("~"), home);
+		assert_eq!(dir("/srv/gh"), PathBuf::from("/srv/gh"));
+	}
 
 	#[test]
 	fn exclude_repo_marks_as_excluded() {
