@@ -4,9 +4,9 @@
 
 - A failed clone or pull now shows git's own error message
 - `add` and `remove` now accept `user/a,b,c` to name several repos from one owner
-- Added a `[hosts]` config table recording each forge's type and optional token. Existing `gitlab_tokens` entries are migrated automatically
 - Added Forgejo support, which also covers Gitea and Codeberg. Repos are added by URL, the same way as GitLab
 - Added GitLab support: `gitkeep add <url>` tracks a group (including subgroups), users, or single projects on any GitLab instance. GitLab archives live under `<host>/<namespace>/<project>`; `remove`, `sync`, and `list` accept the host-qualified `host/namespace/project` form or the full URL
+- Added per-host tokens in the config for accessing private GitLab and Forgejo repos
 - Fixed an archive directory starting with `~` being created as a folder literally named `~` in the current directory instead of under your home directory
 - `gitkeep init` now saves a relative archive directory as an absolute path, so the archive no longer depends on where gitkeep is run from
 - `gitkeep sync <targets>` now syncs only the named accounts and repos, including frozen ones
