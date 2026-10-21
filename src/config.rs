@@ -529,7 +529,7 @@ mod tests {
 		let mut config = Config::default();
 		config.pin_repo_with_options("bob/baz", None, None);
 		let removed = config.remove_pins_covered(&TrackedAccount::with_options("alice", false, false));
-		assert!(removed.is_empty());
+		assert_eq!(removed, Vec::<String>::new());
 	}
 
 	#[test]
