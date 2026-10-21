@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `gitkeep add` now prints one combined summary when adding accounts and individual repos together
+
 ## 0.3.0
 
 - A failed clone or pull now shows git's own error message

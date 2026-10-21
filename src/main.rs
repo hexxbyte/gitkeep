@@ -49,18 +49,12 @@ async fn run_add(
 	if no_sync {
 		return Ok(());
 	}
-	if !added.accounts.is_empty() {
-		let opts = sync::SyncOptions {
-			force_forks: forks,
-			force_submodules: submodules_override.unwrap_or(false),
-			..Default::default()
-		};
-		sync::run_for(&added.accounts, opts).await?;
-	}
-	if !added.restored_owners.is_empty() {
-		sync::run_for(&added.restored_owners, sync::SyncOptions::default()).await?;
-	}
-	sync::run_pinned(&added.pinned).await
+	let opts = sync::SyncOptions {
+		force_forks: forks,
+		force_submodules: submodules_override.unwrap_or(false),
+		..Default::default()
+	};
+	sync::run_added(&added, opts).await
 }
 
 #[tokio::main(flavor = "current_thread")]
