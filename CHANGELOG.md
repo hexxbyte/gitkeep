@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - A failed clone or pull now shows git's own error message
 - `add` and `remove` now accept `user/a,b,c` to name several repos from one owner
