@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `gitkeep size` now shows just the total by default. Pass `--breakdown` to also list each account's size
+- `gitkeep size` now shows just the total by default. Pass `--breakdown` to also list each account's size, including each account on other forges instead of one line per host
 
 ## 0.3.1
 

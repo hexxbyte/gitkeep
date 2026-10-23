@@ -1,4 +1,8 @@
-use std::{fmt::Write as _, fs, path::Path};
+use std::{
+	fmt::Write as _,
+	fs,
+	path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result};
 use clap::ValueEnum;
@@ -22,23 +26,42 @@ pub fn run(format: SizeFormat, breakdown: bool) -> Result<()> {
 		println!("Archive directory {} does not exist yet.", archive_dir.display());
 		return Ok(());
 	}
-	let mut entries: Vec<(String, u64)> = Vec::new();
-	for entry in fs::read_dir(&archive_dir)
-		.with_context(|| format!("Could not read archive directory {}", archive_dir.display()))?
-	{
-		let entry = entry?;
-		if !entry.file_type()?.is_dir() {
-			continue;
-		}
-		let size = dir_size(&entry.path())?;
-		entries.push((entry.file_name().to_string_lossy().into_owned(), size));
-	}
+	let entries = account_sizes(&archive_dir)?;
 	if entries.is_empty() {
 		println!("Archive is empty.");
 		return Ok(());
 	}
 	println!("{}", build_report(entries, format, breakdown));
 	Ok(())
+}
+
+/// Measures each account directory in the archive. Archives from forges other than GitHub sit under
+/// a host directory (its name has a dot, which GitHub names can't), so those are measured one level
+/// down and named `host/owner`.
+fn account_sizes(archive_dir: &Path) -> Result<Vec<(String, u64)>> {
+	let mut entries = Vec::new();
+	for (name, path) in subdirs(archive_dir)? {
+		if name.contains('.') {
+			for (owner, owner_path) in subdirs(&path)? {
+				entries.push((format!("{name}/{owner}"), dir_size(&owner_path)?));
+			}
+		} else {
+			entries.push((name, dir_size(&path)?));
+		}
+	}
+	Ok(entries)
+}
+
+/// Lists the directories directly under `path` by name.
+fn subdirs(path: &Path) -> Result<Vec<(String, PathBuf)>> {
+	let mut dirs = Vec::new();
+	for entry in fs::read_dir(path).with_context(|| format!("Could not read directory {}", path.display()))? {
+		let entry = entry?;
+		if entry.file_type()?.is_dir() {
+			dirs.push((entry.file_name().to_string_lossy().into_owned(), entry.path()));
+		}
+	}
+	Ok(dirs)
 }
 
 /// The total size, preceded with `breakdown` by each account's size, largest first.
@@ -94,10 +117,28 @@ fn format_with_units(bytes: u64, base: f64, units: &[&str]) -> String {
 
 #[cfg(test)]
 mod tests {
+	use std::{env, process};
+
 	use super::*;
 
 	fn entries() -> Vec<(String, u64)> {
 		vec![("bob".into(), 100), ("alice".into(), 300)]
+	}
+
+	#[test]
+	fn account_sizes_splits_host_directories_by_owner() {
+		let root = env::temp_dir().join(format!("gitkeep-size-test-{}", process::id()));
+		for (dir, bytes) in [("alice/a", 10), ("gitlab.example.com/grp/sub/b", 20), ("codeberg.org/bob/c", 30)] {
+			fs::create_dir_all(root.join(dir)).unwrap();
+			fs::write(root.join(dir).join("f"), vec![0; bytes]).unwrap();
+		}
+		let mut entries = account_sizes(&root).unwrap();
+		entries.sort();
+		fs::remove_dir_all(&root).unwrap();
+		assert_eq!(
+			entries,
+			[("alice".into(), 10), ("codeberg.org/bob".into(), 30), ("gitlab.example.com/grp".into(), 20)]
+		);
 	}
 
 	#[test]
