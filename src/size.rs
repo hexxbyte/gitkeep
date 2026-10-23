@@ -64,11 +64,11 @@ fn subdirs(path: &Path) -> Result<Vec<(String, PathBuf)>> {
 	Ok(dirs)
 }
 
-/// The total size, preceded with `breakdown` by each account's size, largest first.
+/// The total size alone, or with `breakdown`, each account's size, largest first, then the total.
 fn build_report(mut entries: Vec<(String, u64)>, format: SizeFormat, breakdown: bool) -> String {
 	let total = format_size(entries.iter().map(|(_, size)| size).sum(), format);
 	if !breakdown {
-		return format!("Total: {total}");
+		return total;
 	}
 	entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 	let width = entries.iter().map(|(name, _)| name.len()).max().unwrap_or(0);
@@ -143,7 +143,7 @@ mod tests {
 
 	#[test]
 	fn report_shows_only_total_by_default() {
-		assert_eq!(build_report(entries(), SizeFormat::Raw, false), "Total: 400 bytes");
+		assert_eq!(build_report(entries(), SizeFormat::Raw, false), "400 bytes");
 	}
 
 	#[test]
