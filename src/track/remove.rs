@@ -8,7 +8,7 @@ use anyhow::Result;
 use crate::{
 	config::{Config, TrackedAccount},
 	forge::{Target, archive_path},
-	utils::{confirm, plural},
+	utils::confirm,
 };
 
 /// Stops tracking accounts or repos on any forge, offering to delete their local copies.
@@ -50,11 +50,7 @@ async fn remove_one(
 	}
 	if let Some(pin) = config.unpin_repo(&key) {
 		println!("No longer tracking {pin}.");
-		let dir = archive_path(archive_root, &pin);
-		if delete_dir && dir.exists() {
-			println!("Deleting {}...", dir.display());
-			fs::remove_dir_all(&dir)?;
-		}
+		delete_pinned_dir(archive_root, &pin, delete_dir || yes)?;
 		return Ok(true);
 	}
 	if target.path.contains('/')
@@ -83,11 +79,8 @@ fn remove_untracked(
 ) -> Result<bool> {
 	let as_account =
 		TrackedAccount { host: target.host.clone(), ..TrackedAccount::with_options(&target.path, false, false) };
-	let mut matching: Vec<String> =
-		config.pinned.iter().filter(|p| as_account.covers(&p.full_name)).map(|p| p.full_name.clone()).collect();
-	matching.sort();
-	let (parent, name) = parent_and_name(archive_root, key);
-	if matching.is_empty() {
+	if !config.pinned.iter().any(|p| as_account.covers(&p.full_name)) {
+		let (parent, name) = parent_and_name(archive_root, key);
 		match find_dir_ignoring_case(&parent, name)? {
 			Some(dir) => {
 				println!("'{key}' is not tracked, but a local archive exists at {}.", dir.display());
@@ -100,29 +93,24 @@ fn remove_untracked(
 		}
 		return Ok(false);
 	}
-	println!(
-		"'{key}' is not tracked, but you have {} individually tracked under it:",
-		plural(matching.len(), "repo", "repos")
-	);
-	for repo in &matching {
-		println!("  {repo}");
-	}
-	if !yes && !confirm("Remove these repos too?", false)? {
-		return Ok(false);
-	}
 	for repo in config.remove_pins_covered(&as_account) {
 		println!("No longer tracking {repo}.");
-		let repo_dir = archive_path(archive_root, &repo);
-		if repo_dir.exists() && (delete_dir || yes || confirm(&format!("Delete local archive for {repo}?"), false)?) {
-			println!("Deleting {}...", repo_dir.display());
-			fs::remove_dir_all(&repo_dir)?;
-		}
-	}
-	// Clean up the owner's directory if that left it empty.
-	if let Some(dir) = find_dir_ignoring_case(&parent, name)? {
-		let _ = fs::remove_dir(&dir);
+		delete_pinned_dir(archive_root, &repo, delete_dir || yes)?;
 	}
 	Ok(true)
+}
+
+/// Offers to delete the local copy of the pinned repo `full_name`, then removes its owner's
+/// directory if that left it empty.
+fn delete_pinned_dir(archive_root: &Path, full_name: &str, delete: bool) -> Result<()> {
+	let (parent, name) = parent_and_name(archive_root, full_name);
+	let Some(dir) = find_dir_ignoring_case(&parent, name)? else { return Ok(()) };
+	if delete || confirm(&format!("Delete local archive for {full_name}?"), false)? {
+		println!("Deleting {}...", dir.display());
+		fs::remove_dir_all(&dir)?;
+		let _ = fs::remove_dir(&parent);
+	}
+	Ok(())
 }
 
 /// Removes a single repo under the fully tracked account `owner` by excluding it from syncs, then
@@ -318,6 +306,17 @@ mod tests {
 		assert!(remove(&mut config, &root, "Bob/Repo", false).await);
 		assert!(!config.is_pinned("bob/repo"));
 		assert!(config.excluded.is_empty());
+		fs::remove_dir_all(&root).unwrap();
+	}
+
+	#[tokio::test]
+	async fn remove_pinned_repo_deletes_local_copy_and_empty_owner_dir() {
+		let root = temp_dir();
+		fs::create_dir_all(root.join("rust-lang/mdBook")).unwrap();
+		let mut config = Config::default();
+		config.pin_repo_with_options("rust-lang/mdBook", None, None);
+		assert!(remove(&mut config, &root, "rust-lang/mdbook", false).await);
+		assert!(!root.join("rust-lang").exists());
 		fs::remove_dir_all(&root).unwrap();
 	}
 

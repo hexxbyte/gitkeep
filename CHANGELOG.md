@@ -2,7 +2,9 @@
 
 ## Unreleased
 
+- Fixed `gitkeep remove user/repo` not offering to delete the local copy of an individually tracked repo
 - `gitkeep add` now prints one combined summary when adding accounts and individual repos together
+- `gitkeep remove <owner>` no longer asks before untracking the repos you track individually under it, only before deleting them
 
 ## 0.3.0
 
