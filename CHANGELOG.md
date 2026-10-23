@@ -7,6 +7,7 @@
 - Fixed the unauthenticated mode warning being printed more than once per command
 - `gitkeep add` now prints one combined summary when adding accounts and individual repos together
 - `gitkeep remove <owner>` no longer asks before untracking the repos you track individually under it, only before deleting them
+- `gitkeep remove` now also removes the owner, group, and host directories that deleting the last repo under them leaves empty
 
 ## 0.3.0
 

@@ -43,8 +43,7 @@ async fn remove_one(
 		let name = account.display_name();
 		let dir = archive_path(archive_root, &name);
 		if dir.exists() && (delete_dir || yes || confirm(&format!("Delete local archive for {name}?"), false)?) {
-			println!("Deleting {}...", dir.display());
-			fs::remove_dir_all(&dir)?;
+			delete_archive_dir(archive_root, &dir)?;
 		}
 		return Ok(true);
 	}
@@ -85,8 +84,7 @@ fn remove_untracked(
 			Some(dir) => {
 				println!("'{key}' is not tracked, but a local archive exists at {}.", dir.display());
 				if delete_dir || yes || confirm("Delete it?", false)? {
-					println!("Deleting {}...", dir.display());
-					fs::remove_dir_all(&dir)?;
+					delete_archive_dir(archive_root, &dir)?;
 				}
 			}
 			None => println!("Not tracking '{key}'."),
@@ -100,15 +98,12 @@ fn remove_untracked(
 	Ok(true)
 }
 
-/// Offers to delete the local copy of the pinned repo `full_name`, then removes its owner's
-/// directory if that left it empty.
+/// Offers to delete the local copy of the pinned repo `full_name`.
 fn delete_pinned_dir(archive_root: &Path, full_name: &str, delete: bool) -> Result<()> {
 	let (parent, name) = parent_and_name(archive_root, full_name);
 	let Some(dir) = find_dir_ignoring_case(&parent, name)? else { return Ok(()) };
 	if delete || confirm(&format!("Delete local archive for {full_name}?"), false)? {
-		println!("Deleting {}...", dir.display());
-		fs::remove_dir_all(&dir)?;
-		let _ = fs::remove_dir(&parent);
+		delete_archive_dir(archive_root, &dir)?;
 	}
 	Ok(())
 }
@@ -147,12 +142,18 @@ async fn exclude_repo(
 			}
 		}
 	};
-	apply_exclusion(config, &full_name, local_dir, delete)
+	apply_exclusion(config, archive_root, &full_name, local_dir, delete)
 }
 
 /// Records `full_name` as excluded and offers to delete its local copy. Returns `true` if the
 /// config changed.
-fn apply_exclusion(config: &mut Config, full_name: &str, local_dir: Option<PathBuf>, delete: bool) -> Result<bool> {
+fn apply_exclusion(
+	config: &mut Config,
+	archive_root: &Path,
+	full_name: &str,
+	local_dir: Option<PathBuf>,
+	delete: bool,
+) -> Result<bool> {
 	let changed = config.exclude_repo(full_name);
 	if changed {
 		println!("{full_name} will no longer be synced.");
@@ -162,10 +163,23 @@ fn apply_exclusion(config: &mut Config, full_name: &str, local_dir: Option<PathB
 	if let Some(dir) = local_dir
 		&& (delete || confirm(&format!("Delete local archive for {full_name}?"), false)?)
 	{
-		println!("Deleting {}...", dir.display());
-		fs::remove_dir_all(&dir)?;
+		delete_archive_dir(archive_root, &dir)?;
 	}
 	Ok(changed)
+}
+
+/// Deletes `dir`, then any parent directories under `archive_root` that this leaves empty (such
+/// as the owner, or a GitLab group and host, of the last repo archived under them).
+fn delete_archive_dir(archive_root: &Path, dir: &Path) -> Result<()> {
+	println!("Deleting {}...", dir.display());
+	fs::remove_dir_all(dir)?;
+	// `remove_dir` only succeeds on an empty directory, so the walk stops at the first one that isn't.
+	for parent in dir.ancestors().skip(1).take_while(|p| p.starts_with(archive_root) && *p != archive_root) {
+		if fs::remove_dir(parent).is_err() {
+			break;
+		}
+	}
+	Ok(())
 }
 
 /// Finds the directory under `parent` named `name`, ignoring case: forge names aren't
@@ -317,6 +331,19 @@ mod tests {
 		config.pin_repo_with_options("rust-lang/mdBook", None, None);
 		assert!(remove(&mut config, &root, "rust-lang/mdbook", false).await);
 		assert!(!root.join("rust-lang").exists());
+		fs::remove_dir_all(&root).unwrap();
+	}
+
+	#[tokio::test]
+	async fn remove_nested_gitlab_pin_cleans_up_empty_group_and_host_dirs() {
+		let root = temp_dir();
+		fs::create_dir_all(root.join("gitlab.example.com/grp/sub/proj")).unwrap();
+		fs::create_dir_all(root.join("alice")).unwrap();
+		let mut config = Config::default();
+		config.pin_repo_with_options("gitlab.example.com/grp/sub/proj", None, None);
+		assert!(remove(&mut config, &root, "gitlab.example.com/grp/sub/proj", false).await);
+		assert!(!root.join("gitlab.example.com").exists());
+		assert!(root.join("alice").exists());
 		fs::remove_dir_all(&root).unwrap();
 	}
 
