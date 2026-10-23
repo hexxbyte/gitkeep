@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.1
 
 - A relative archive directory in the config is now relative to your home directory instead of wherever gitkeep is run from
 - Fixed `gitkeep remove user/repo` not offering to delete the local copy of an individually tracked repo
