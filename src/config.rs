@@ -96,10 +96,9 @@ impl Config {
 		match self.archive_dir.as_deref() {
 			None => Ok(home()?.join("gitkeep")),
 			Some("~") => home(),
-			Some(dir) => match dir.strip_prefix("~/") {
-				Some(rest) => Ok(home()?.join(rest)),
-				None => Ok(PathBuf::from(dir)),
-			},
+			// Relative paths are relative to home, not the current directory; joining an absolute
+			// path leaves it unchanged.
+			Some(dir) => Ok(home()?.join(dir.strip_prefix("~/").unwrap_or(dir))),
 		}
 	}
 
@@ -296,11 +295,12 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn archive_dir_expands_tilde() {
+	fn archive_dir_resolves_tilde_and_relative_paths_against_home() {
 		let home = home_dir().unwrap();
 		let dir = |d: &str| Config { archive_dir: Some(d.into()), ..Config::default() }.archive_dir().unwrap();
 		assert_eq!(dir("~/gh"), home.join("gh"));
 		assert_eq!(dir("~"), home);
+		assert_eq!(dir("gh"), home.join("gh"));
 		assert_eq!(dir("/srv/gh"), PathBuf::from("/srv/gh"));
 	}
 

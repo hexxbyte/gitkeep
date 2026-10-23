@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- A relative archive directory in the config is now relative to your home directory instead of wherever gitkeep is run from
 - Fixed `gitkeep remove user/repo` not offering to delete the local copy of an individually tracked repo
 - Fixed the unauthenticated mode warning being printed more than once per command
 - `gitkeep add` now prints one combined summary when adding accounts and individual repos together
