@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `gitkeep size` now shows just the total by default. Pass `--breakdown` to also list each account's size
+
 ## 0.3.1
 
 - A relative archive directory in the config is now relative to your home directory instead of wherever gitkeep is run from

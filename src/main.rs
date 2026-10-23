@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
 		}
 		Commands::Remove { users, delete, yes } => track::remove(&utils::expand_targets(users)?, delete, yes).await,
 		Commands::List => track::list(),
-		Commands::Size { format } => size::run(format),
+		Commands::Size { format, breakdown } => size::run(format, breakdown),
 		Commands::Sync { users, forks, submodules, pull_only, new_only, quiet, verbose } => {
 			let verbosity = if quiet {
 				sync::Verbosity::Quiet

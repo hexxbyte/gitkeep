@@ -87,11 +87,12 @@ A sync that fails to pull an existing repo because it no longer matches what's o
 Show all tracked users and orgs, including any per-account flags, individually tracked repos, and repos removed from tracked accounts.
 
 ### `size`  _(alias: `du`)_
-Show the on-disk size of the archive, broken down per account.
+Show the total on-disk size of the archive.
 
 | Flag | Description |
 |------|-------------|
 | `-s, --format <FORMAT>` | Unit format: `decimal` (kB/MB/GB, base 1000), `binary` (KiB/MiB/GiB, base 1024, default), or `raw` (exact byte count) |
+| `-b, --breakdown` | Also list each account's size, largest first |
 
 ### `remove <TARGET>...`  _(alias: `rm`)_
 Stop tracking one or more users, orgs, or repos. Accepts either a plain username/org or `user/repo`. A `user/repo` target can be an individually pinned repo or a single repo under a fully tracked account; the latter is left out of future syncs while the rest of the account keeps syncing (run `gitkeep add user/repo` to undo). Like `add`, it accepts `user/a,b,c` to name several repos from one owner. GitLab projects work the same way as `host/namespace/project` (or the URL), including removing one project from a tracked group. Prompts to delete the local archive directory; pass `--delete` to skip the prompt. If a target isn't tracked as a full user but has individually pinned repos under it, prompts to remove those too.

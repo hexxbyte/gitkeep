@@ -53,12 +53,15 @@ pub enum Commands {
 	/// Show all tracked accounts and repos
 	#[command(alias = "ls")]
 	List,
-	/// Show the on-disk size of the archive, broken down per account
+	/// Show the on-disk size of the archive
 	#[command(alias = "du")]
 	Size {
 		/// Size unit format to display
 		#[arg(short = 's', long, value_enum, default_value = "binary")]
 		format: SizeFormat,
+		/// Also show the size of each account
+		#[arg(short, long)]
+		breakdown: bool,
 	},
 	/// Sync every tracked account that isn't frozen and every tracked repo, or just the named ones
 	#[command(alias = "run")]

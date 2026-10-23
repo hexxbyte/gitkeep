@@ -15,7 +15,7 @@ pub enum SizeFormat {
 	Raw,
 }
 
-pub fn run(format: SizeFormat) -> Result<()> {
+pub fn run(format: SizeFormat, breakdown: bool) -> Result<()> {
 	let config = Config::load()?;
 	let archive_dir = config.archive_dir()?;
 	if !archive_dir.exists() {
@@ -23,7 +23,6 @@ pub fn run(format: SizeFormat) -> Result<()> {
 		return Ok(());
 	}
 	let mut entries: Vec<(String, u64)> = Vec::new();
-	let mut total = 0u64;
 	for entry in fs::read_dir(&archive_dir)
 		.with_context(|| format!("Could not read archive directory {}", archive_dir.display()))?
 	{
@@ -32,23 +31,30 @@ pub fn run(format: SizeFormat) -> Result<()> {
 			continue;
 		}
 		let size = dir_size(&entry.path())?;
-		total += size;
 		entries.push((entry.file_name().to_string_lossy().into_owned(), size));
 	}
 	if entries.is_empty() {
 		println!("Archive is empty.");
 		return Ok(());
 	}
+	println!("{}", build_report(entries, format, breakdown));
+	Ok(())
+}
+
+/// The total size, preceded with `breakdown` by each account's size, largest first.
+fn build_report(mut entries: Vec<(String, u64)>, format: SizeFormat, breakdown: bool) -> String {
+	let total = format_size(entries.iter().map(|(_, size)| size).sum(), format);
+	if !breakdown {
+		return format!("Total: {total}");
+	}
 	entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 	let width = entries.iter().map(|(name, _)| name.len()).max().unwrap_or(0);
-	let mut out = String::new();
+	let mut out = String::from("Per-account sizes:\n");
 	for (name, size) in &entries {
-		let _ = writeln!(out, "  {name:width$}  {}", format_size(*size, format));
+		let _ = writeln!(out, "{name:width$}  {}", format_size(*size, format));
 	}
-	let _ = writeln!(out);
-	let _ = write!(out, "Total: {}", format_size(total, format));
-	println!("{out}");
-	Ok(())
+	let _ = write!(out, "\nTotal: {total}");
+	out
 }
 
 /// Sums the apparent size of every regular file under `path`. Symlinks aren't followed, so
@@ -89,6 +95,23 @@ fn format_with_units(bytes: u64, base: f64, units: &[&str]) -> String {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	fn entries() -> Vec<(String, u64)> {
+		vec![("bob".into(), 100), ("alice".into(), 300)]
+	}
+
+	#[test]
+	fn report_shows_only_total_by_default() {
+		assert_eq!(build_report(entries(), SizeFormat::Raw, false), "Total: 400 bytes");
+	}
+
+	#[test]
+	fn report_breakdown_lists_accounts_largest_first_under_a_header() {
+		assert_eq!(
+			build_report(entries(), SizeFormat::Raw, true),
+			"Per-account sizes:\nalice  300 bytes\nbob    100 bytes\n\nTotal: 400 bytes"
+		);
+	}
 
 	#[test]
 	fn raw_format_shows_exact_bytes() {
