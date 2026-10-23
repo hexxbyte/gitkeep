@@ -2,6 +2,7 @@ use std::{
 	collections::{BTreeMap, HashMap, HashSet},
 	fs, mem,
 	path::PathBuf,
+	sync::Once,
 };
 
 use anyhow::{Context, Result, bail};
@@ -105,7 +106,11 @@ impl Config {
 	pub fn build_client(&self) -> Result<Octocrab> {
 		self.token.as_ref().map_or_else(
 			|| {
-				println!("Warning: Running in unauthenticated mode. Rate limits will be restricted.");
+				// A single command can build several clients, but the warning only needs saying once.
+				static WARN: Once = Once::new();
+				WARN.call_once(|| {
+					println!("Warning: Running in unauthenticated mode. Rate limits will be restricted.");
+				});
 				OctocrabBuilder::default().build().context("Could not create GitHub client")
 			},
 			|token| {
